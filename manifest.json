@@ -1,0 +1,22 @@
+{
+    "manifest_version": 3,
+    "name": "Screen Time Tracker",
+    "version": "1.0",
+    "description": "Tracks the amount of time spent on websites, manages a to-do list with categories and deadlines, and sends notifications.",
+    "permissions": [
+      "tabs",
+      "storage",
+      "activeTab",
+      "notifications"
+    ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "action": {
+      "default_popup": "popup.html"
+    },
+    "icons": {
+      "48": "icon.png"
+    }
+  }
+  
