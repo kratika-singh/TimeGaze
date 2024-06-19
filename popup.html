@@ -2,18 +2,24 @@
 <html>
 <head>
   <title>Screen Time Tracker</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="node_modules/chart.js/dist/chart.umd.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <!-- <script src="node_modules/chart.js/dist/chart.umd.js"></script> -->
+   <script src="chart-min.js"></script>
+  <script src="utils.js"></script>
 </head>
 <body>
   <h1>Screen Time Tracker</h1>
-  <canvas id="screenTimeChart" width="400" height="200"></canvas>
+  <canvas id="screenTimeChart" width="400px" height="200px"></canvas>
+
   <h2>To-Do List</h2>
   <div id="todo-container">
     <input type="text" id="new-task" placeholder="New task...">
+    <input type="text" id="task-category" placeholder="Category">
+    <input type="date" id="task-deadline">
     <button id="add-task">Add</button>
     <ul id="task-list"></ul>
   </div>
+
   <script src="popup.js"></script>
 </body>
 </html>

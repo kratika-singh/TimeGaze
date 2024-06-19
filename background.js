@@ -4,17 +4,19 @@ let lastMouseMoveTime = Date.now();
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
   chrome.tabs.get(activeInfo.tabId, (tab) => {
-    let url = new URL(tab.url);
-    let domain = url.hostname;
-    let now = Date.now();
+    if (tab && tab.url) {
+      let url = new URL(tab.url);
+      let domain = url.hostname;
+      let now = Date.now();
 
-    if (activeTabs[activeInfo.previousTabId]) {
-      let prevDomain = activeTabs[activeInfo.previousTabId].domain;
-      let timeSpent = (now - activeTabs[activeInfo.previousTabId].startTime) / 1000;
-      updateTrackedTime(prevDomain, timeSpent);
+      if (activeTabs[activeInfo.previousTabId]) {
+        let prevDomain = activeTabs[activeInfo.previousTabId].domain;
+        let timeSpent = (now - activeTabs[activeInfo.previousTabId].startTime) / 1000;
+        updateTrackedTime(prevDomain, timeSpent);
+      }
+
+      activeTabs[activeInfo.tabId] = { domain: domain, startTime: now };
     }
-
-    activeTabs[activeInfo.tabId] = { domain: domain, startTime: now };
   });
 });
 
@@ -28,8 +30,19 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
-chrome.notifications.onClicked.addListener((notificationId) => {
-  chrome.notifications.clear(notificationId);
+chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+  if (message.type === 'interactionUpdate') {
+    const { timestamp } = message;
+    
+    // Example: Store interaction time
+    chrome.storage.sync.get('interactionTime', function(result) {
+      let interactionTime = result.interactionTime || 0;
+      interactionTime += timestamp - interactionTime; // Update interaction time
+      chrome.storage.sync.set({ interactionTime: interactionTime }, function() {
+        console.log('Interaction time updated:', interactionTime);
+      });
+    });
+  }
 });
 
 function updateTrackedTime(domain, timeSpent) {
@@ -69,7 +82,3 @@ function checkMouseInactivity() {
 }
 
 setInterval(checkMouseInactivity, 60000); // check every minute
-
-document.addEventListener('mousemove', () => {
-  lastMouseMoveTime = Date.now();
-});

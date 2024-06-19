@@ -10,13 +10,13 @@ document.addEventListener('DOMContentLoaded', function () {
     chrome.storage.sync.get('trackedTime', (result) => {
       const trackedTime = result.trackedTime || {};
       const today = getFormattedDate(new Date());
-      const labels = Object.keys(trackedTime[today] || {});
+      const label1 = Object.keys(trackedTime[today] || {});
       const data = Object.values(trackedTime[today] || {});
   
       new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: labels,
+          labels: label1,
           datasets: [{
             label: 'Time spent (seconds)',
             data: data,
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       });
     });
-  
+   
     // Handle adding a new task
     addTaskButton.addEventListener('click', () => {
       const task = taskInput.value.trim();
@@ -86,4 +86,8 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
   });
+  
+  function getFormattedDate(date) {
+    return date.toISOString().slice(0, 10);
+  }
   
