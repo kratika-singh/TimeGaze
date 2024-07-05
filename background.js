@@ -1,19 +1,17 @@
-let activeTabId = null;
-let trackedTime = {};
 let activeTabs = {};
+let trackedTime = {};
 let lastMouseMoveTime = Date.now();
-let updateInterval = 10 * 60; 
+let lastActiveTabId = null;
 
+chrome.storage.sync.get('totalActiveTime', function (data) {
+  let totalActiveTime = data.totalActiveTime || 0;
+});
+
+// Helper function to update tracked time for a given domain
 function updateTrackedTime(domain, timeSpent) {
-  if (typeof domain !== 'string' || typeof timeSpent !== 'number' || timeSpent < 0) {
-    console.error('Invalid input');
-    return;
-  }
-
   let today = new Date().toISOString().slice(0, 10);
-
   chrome.storage.sync.get(['trackedTime'], (result) => {
-    let trackedTime = result.trackedTime || {};
+    trackedTime = result.trackedTime || {};
 
     if (!trackedTime[today]) {
       trackedTime[today] = {};
@@ -24,24 +22,17 @@ function updateTrackedTime(domain, timeSpent) {
     }
 
     trackedTime[today][domain] += timeSpent;
-
-    chrome.storage.sync.set({ trackedTime: trackedTime }, () => {
-      if (chrome.runtime.lastError) {
-        console.error('Error saving tracked time:', chrome.runtime.lastError);
-      } else {
-        console.log('Tracked time updated successfully');
-      }
-    });
+    chrome.storage.sync.set({ trackedTime: trackedTime });
   });
 }
 
-
+// Handle tab activation
 chrome.tabs.onActivated.addListener((activeInfo) => {
   let now = Date.now();
-  
-  if (activeTabId !== null && activeTabs[activeTabId]) {
-    let prevDomain = activeTabs[activeTabId].domain;
-    let timeSpent = (now - activeTabs[activeTabId].startTime) / 1000;
+
+  if (lastActiveTabId !== null && activeTabs[lastActiveTabId]) {
+    let prevDomain = activeTabs[lastActiveTabId].domain;
+    let timeSpent = (now - activeTabs[lastActiveTabId].startTime) / 1000;
     updateTrackedTime(prevDomain, timeSpent);
   }
 
@@ -50,56 +41,61 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
       let url = new URL(tab.url);
       let domain = url.hostname;
       activeTabs[activeInfo.tabId] = { domain: domain, startTime: now };
-      activeTabId = activeInfo.tabId;
+      lastActiveTabId = activeInfo.tabId;
     }
   });
 });
 
+// Handle window focus changes
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  let now = Date.now();
 
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (activeTabs[tabId]) {
-    let now = Date.now();
-    let domain = activeTabs[tabId].domain;
-    let timeSpent = (now - activeTabs[tabId].startTime) / 1000;
-    updateTrackedTime(domain, timeSpent);
-    delete activeTabs[tabId];
-
-    if (tabId === activeTabId) {
-      activeTabId = null;
-    }
+  if (lastActiveTabId !== null && activeTabs[lastActiveTabId]) {
+    let prevDomain = activeTabs[lastActiveTabId].domain;
+    let timeSpent = (now - activeTabs[lastActiveTabId].startTime) / 1000;
+    updateTrackedTime(prevDomain, timeSpent);
   }
-});
 
-
-
-chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
-  if (message.type === 'interactionUpdate') {
-    const { timestamp } = message;
-
-    // Example: Store interaction time
-    chrome.storage.sync.get('interactionTime', function(result) {
-      let interactionTime = result.interactionTime || 0;
-      interactionTime += timestamp - interactionTime; // Update interaction time
-      chrome.storage.sync.set({ interactionTime: interactionTime }, function() {
-        console.log('Interaction time updated:', interactionTime);
-      });
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    lastActiveTabId = null;
+  } else {
+    chrome.tabs.query({ active: true, windowId }, (tabs) => {
+      if (tabs.length > 0) {
+        let tab = tabs[0];
+        let url = new URL(tab.url);
+        let domain = url.hostname;
+        activeTabs[tab.id] = { domain: domain, startTime: now };
+        lastActiveTabId = tab.id;
+      }
     });
   }
 });
 
+// Handle tab removal
+chrome.tabs.onRemoved.addListener((tabId) => {
+  let now = Date.now();
 
-
-setInterval(() => {
-  if (activeTabId !== null && activeTabs[activeTabId]) {
-    let now = Date.now();
-    let domain = activeTabs[activeTabId].domain;
-    let timeSpent = (now - activeTabs[activeTabId].startTime) / 1000;
+  if (activeTabs[tabId]) {
+    let domain = activeTabs[tabId].domain;
+    let timeSpent = (now - activeTabs[tabId].startTime) / 1000;
     updateTrackedTime(domain, timeSpent);
-    activeTabs[activeTabId].startTime = now; // Reset the start time
+    delete activeTabs[tabId];
   }
-}, updateInterval);
+});
 
+// Handle user interaction messages
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'interactionUpdate') {
+    lastMouseMoveTime = Date.now();
+    chrome.storage.sync.get('totalActiveTime', function (data) {
+      let totalActiveTime = data.totalActiveTime || 0;
+      totalActiveTime += message.timestamp - lastMouseMoveTime;
+      chrome.storage.sync.set({ totalActiveTime: totalActiveTime });
+    });
+  }
+});
 
+// Send notification
 function sendNotification(message) {
   chrome.notifications.create({
     type: 'basic',
@@ -110,39 +106,13 @@ function sendNotification(message) {
   });
 }
 
-let startTime = Date.now();
-let totalActiveTime = parseInt(localStorage.getItem('totalActiveTime')) || 0;
-
-function sendNotification(message) {
-  console.log(message); // Replace with actual notification logic
-}
-
-function checkScreenTime() {
+// Check for mouse inactivity
+function checkMouseInactivity() {
   let now = Date.now();
-  let activeTime = now - startTime + totalActiveTime;
-
-  if (activeTime > 3600000) { // 1 hour in milliseconds
-    sendNotification('You have been using the screen for an hour. Consider taking a break.');
-    startTime = now; // reset the timer
-    totalActiveTime = 0; // reset active time
-    localStorage.setItem('totalActiveTime', totalActiveTime); // reset stored active time
-  } else {
-    localStorage.setItem('totalActiveTime', activeTime); // update stored active time
+  if (now - lastMouseMoveTime > 3600000) { // 1 hour
+    sendNotification('You have been active for an hour. Consider taking a break.');
+    lastMouseMoveTime = now; // reset the timer
   }
 }
 
-function handleVisibilityChange() {
-  if (document.visibilityState === 'hidden') {
-    // Pause timer
-    totalActiveTime += Date.now() - startTime;
-    localStorage.setItem('totalActiveTime', totalActiveTime); // store accumulated time
-  } else {
-    // Resume timer
-    startTime = Date.now();
-  }
-}
-
-document.addEventListener('visibilitychange', handleVisibilityChange);
-
-setInterval(checkScreenTime, 60000); // Check every minute
-
+setInterval(checkMouseInactivity, 60000); // check every minute
