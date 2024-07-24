@@ -8,7 +8,7 @@
 
 
 ## Table of Contents
-- [Introduction](#introduction)
+- [Introduction](#-introduction)
 - [Problem it Solves](#problem-it-solves)
 - [Tech Stack](#tech-stack)
 - [Screengrabs](#screengrabs)
@@ -34,8 +34,6 @@ In today's digital age, it's easy to lose track of time spent on various website
 - CSS
 
 ## 📷 Screengrabs
-
-![Alt text](./images/screenshot.png)
 
 ## 🌺 Scalability
 
