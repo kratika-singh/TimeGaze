@@ -1,118 +1,99 @@
-let activeTabs = {};
-let trackedTime = {};
-let lastMouseMoveTime = Date.now();
-let lastActiveTabId = null;
-
-chrome.storage.sync.get('totalActiveTime', function (data) {
-  let totalActiveTime = data.totalActiveTime || 0;
-});
-
-// Helper function to update tracked time for a given domain
-function updateTrackedTime(domain, timeSpent) {
-  let today = new Date().toISOString().slice(0, 10);
-  chrome.storage.sync.get(['trackedTime'], (result) => {
-    trackedTime = result.trackedTime || {};
-
-    if (!trackedTime[today]) {
-      trackedTime[today] = {};
-    }
-
-    if (!trackedTime[today][domain]) {
-      trackedTime[today][domain] = 0;
-    }
-
-    trackedTime[today][domain] += timeSpent;
-    chrome.storage.sync.set({ trackedTime: trackedTime });
-  });
+function getCurrentDomain() {
+    return new Promise((resolve) => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs && tabs.length) {
+                try {
+                    const { url, favIconUrl } = tabs[0];
+                    const { hostname } = new URL(url);
+                    const domain = hostname.replace("www.", "");
+                    chrome.storage.local.get(["icons"], ({ icons }) => {
+                        icons = icons || {};
+                        icons[domain] = favIconUrl;
+                        chrome.storage.local.set({ icons }, () => resolve(domain));
+                    });
+                } catch (error) {
+                    resolve("");
+                }
+            } else {
+                resolve("");
+            }
+        });
+    });
 }
 
-// Handle tab activation
-chrome.tabs.onActivated.addListener((activeInfo) => {
-  let now = Date.now();
+function setCurrentDomain(domain) {
+    return new Promise((resolve) => chrome.storage.local.set({ domain }, () => resolve(domain)));
+}
 
-  if (lastActiveTabId !== null && activeTabs[lastActiveTabId]) {
-    let prevDomain = activeTabs[lastActiveTabId].domain;
-    let timeSpent = (now - activeTabs[lastActiveTabId].startTime) / 1000;
-    updateTrackedTime(prevDomain, timeSpent);
-  }
-
-  chrome.tabs.get(activeInfo.tabId, (tab) => {
-    if (tab && tab.url) {
-      let url = new URL(tab.url);
-      let domain = url.hostname;
-      activeTabs[activeInfo.tabId] = { domain: domain, startTime: now };
-      lastActiveTabId = activeInfo.tabId;
-    }
-  });
+chrome.runtime.onInstalled.addListener(() => {
+    chrome.storage.local.set({ domain: "", timestamp: 0 });
 });
 
-// Handle window focus changes
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") {
+        return;
+    }
+
+    const { domain } = changes;
+    if (!domain) {
+        return;
+    }
+
+    const { oldValue, newValue } = domain;
+    if (oldValue === newValue) {
+        return;
+    }
+
+    chrome.storage.local.get(["timestamp"], ({ timestamp }) => {
+        if (oldValue && timestamp) {
+            const seconds = Math.round((Date.now() - timestamp) / 1000);
+
+            const today = new Date().setHours(0, 0, 0, 0).toString();
+            chrome.storage.local.get([today], (result) => {
+                if (!result.hasOwnProperty(today) && new Date().getDay() === 1) {
+                    chrome.notifications.create(
+                        null,
+                        {
+                            type: "basic",
+                            iconUrl: "images/icon128.png",
+                            title: "Screen Time",
+                            message: `Screen Time report is ready`,
+                            priority: 2,
+                            eventTime: Date.now()
+                        },
+                        () => chrome.action.setPopup({ popup: "popup.html" })
+                    );
+                }
+                const data = result[today] || {};
+                data[oldValue] = data.hasOwnProperty(oldValue) ? seconds + data[oldValue] : seconds;
+                chrome.storage.local.set({ [today]: data }, () => {
+                    console.log('screen time', oldValue, seconds);
+                });
+            });
+        }
+        chrome.storage.local.set({ timestamp: Date.now() });
+    });
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    const { status } = changeInfo;
+    if (status === "complete") {
+        getCurrentDomain().then(setCurrentDomain).then(domain => console.log('updated', domain));
+    }
+});
+
+chrome.tabs.onActivated.addListener(() => {
+    getCurrentDomain().then(setCurrentDomain).then(domain => console.log('activated', domain));
+});
+
 chrome.windows.onFocusChanged.addListener((windowId) => {
-  let now = Date.now();
-
-  if (lastActiveTabId !== null && activeTabs[lastActiveTabId]) {
-    let prevDomain = activeTabs[lastActiveTabId].domain;
-    let timeSpent = (now - activeTabs[lastActiveTabId].startTime) / 1000;
-    updateTrackedTime(prevDomain, timeSpent);
-  }
-
-  if (windowId === chrome.windows.WINDOW_ID_NONE) {
-    lastActiveTabId = null;
-  } else {
-    chrome.tabs.query({ active: true, windowId }, (tabs) => {
-      if (tabs.length > 0) {
-        let tab = tabs[0];
-        let url = new URL(tab.url);
-        let domain = url.hostname;
-        activeTabs[tab.id] = { domain: domain, startTime: now };
-        lastActiveTabId = tab.id;
-      }
-    });
-  }
+    if (windowId === chrome.windows.WINDOW_ID_NONE) {
+        setCurrentDomain("").then(() => console.log("blur"));
+    } else {
+        getCurrentDomain().then(setCurrentDomain).then(domain => console.log('focus', domain));
+    }
 });
 
-// Handle tab removal
-chrome.tabs.onRemoved.addListener((tabId) => {
-  let now = Date.now();
-
-  if (activeTabs[tabId]) {
-    let domain = activeTabs[tabId].domain;
-    let timeSpent = (now - activeTabs[tabId].startTime) / 1000;
-    updateTrackedTime(domain, timeSpent);
-    delete activeTabs[tabId];
-  }
+chrome.runtime.onSuspend.addListener(() => {
+    setCurrentDomain("").then(() => console.log("suspend"));
 });
-
-// Handle user interaction messages
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'interactionUpdate') {
-    lastMouseMoveTime = Date.now();
-    chrome.storage.sync.get('totalActiveTime', function (data) {
-      let totalActiveTime = data.totalActiveTime || 0;
-      totalActiveTime += message.timestamp - lastMouseMoveTime;
-      chrome.storage.sync.set({ totalActiveTime: totalActiveTime });
-    });
-  }
-});
-
-// Send notification
-function sendNotification(message) {
-  chrome.notifications.create({
-    type: 'basic',
-    iconUrl: 'icon.png',
-    title: 'Screen Time Tracker',
-    message: message,
-    priority: 2
-  });
-}
-
-// Check for mouse inactivity
-function checkMouseInactivity() {
-  let now = Date.now();
-  if (now - lastMouseMoveTime > 3600000) { // 1 hour
-    sendNotification('You have been active for an hour. Consider taking a break.');
-    lastMouseMoveTime = now; // reset the timer
-  }
-}
-
-setInterval(checkMouseInactivity, 60000); // check every minute
