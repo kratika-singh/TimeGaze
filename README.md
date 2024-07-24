@@ -3,19 +3,19 @@
 **TimeGaze** is a Chrome extension designed to help you monitor and manage your screen time effectively. Stay productive and keep track of the time you spend on different websites with ease.
 
 ![GitHub Code Size in bytes](https://img.shields.io/github/languages/code-size/kratika-singh/TimeGaze?style=flat-square&label=Code%20Size&color=5F9EA0) 
-![GitHub issues](https://img.shields.io/github/issues/kratika-singh/TimeGaze?style=flat-square&label=Code%20Size&color=5F9EA0) 
-![GitHub top language](https://img.shields.io/github/languages/top/kratika-singh/TimeGaze?style=flat-square&label=Code%20Size&color=5F9EA0)
+![GitHub issues](https://img.shields.io/github/issues/kratika-singh/TimeGaze?style=flat-square&label=Open%20Issues&color=5F9EA0) 
+![GitHub top language](https://img.shields.io/github/languages/top/kratika-singh/TimeGaze?style=flat-square&color=5F9EA0)
 
 
 ## Table of Contents
 - [Introduction](#-introduction)
-- [Problem it Solves](#problem-it-solves)
-- [Tech Stack](#tech-stack)
-- [Screengrabs](#screengrabs)
-- [Scalability](#scalability)
-- [Setup Guide](#setup-guide)
-- [Contribution Guidelines](#contribution-guidelines)
-- [License](#license)
+- [Problem it Solves](#-problem-it-solves)
+- [Tech Stack](#-tech-stack)
+- [Screengrabs](#-screengrabs)
+- [Scalability](#-scalability)
+- [Setup Guide](#-setup-guide)
+- [Contribution Guidelines](#-contribution-guidelines)
+- [License](#-license)
 
 ## 💙 Introduction
 
@@ -34,7 +34,7 @@ In today's digital age, it's easy to lose track of time spent on various website
 - CSS
 
 ## 📷 Screengrabs
-
+![Alt text](./images/screenshot.png)
 ## 🌺 Scalability
 
 The project can be scaled to include features such as:
