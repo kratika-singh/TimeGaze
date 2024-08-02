@@ -210,14 +210,6 @@ function refresh() {
         document.getElementById("allmax").innerText = Math.max.apply(Math, secondsPerAllDays).toString()
         document.getElementById("allavg").innerText = humanReadableSeconds(Math.round(allSeconds / secondsPerAllDays.length))
     })
-
-    chrome.storage.local.getBytesInUse(null, bytes => {
-        document.getElementById("size").innerText = bytes <= 1024
-            ? `${bytes} bytes`
-            : bytes <= 1024 * 1024
-                ? `${(bytes / 1024).toFixed(2)} kb`
-                : `${(bytes / 1024 / 1024).toFixed(2)} mb`
-    })
 }
 
 if (document) {
